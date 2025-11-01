@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Hub - Instant QR Code Generator</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Highlight, Button, Accent color
+                        'qr-primary': '#66fcf1', 
+                        // Secondary Accent color
+                        'qr-accent': '#66fcf1',  
+                        // Background / section color
+                        'qr-dark-bg': '#1f2833',    
+                        // Text color
+                        'qr-text-light': '#c5c6c7', 
+                    },
+                    fontFamily: {
+                        // 'Inter' for sans-serif base
+                        'sans': ['Inter', 'sans-serif'], 
+                        // 'Dancing Script' for logo/titles
+                        'qr-hub': ['Dancing Script', 'cursive'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            scroll-behavior: smooth;
+        }
+        
+        /* Font for logo and main titles - using 'qr-hub' */
+        .text-qr-hub {
+            font-family: 'Dancing Script', 'cursive';
+        }
+
+        /* New CSS for Typing Animation (Applied to Hero Title) */
+        .typing-container {
+            display: inline-block;
+            white-space: nowrap;
+            overflow: hidden;
+            border-right: 0.15em solid #66fcf1; /* Cursor (qr-primary color) */
+            /* Animation timing is 3s for "The Instant QR Hub!" (22 characters) */
+            animation: 
+                typing 3s steps(22, end) forwards, 
+                blink-caret 0.75s step-end infinite;
+        }
+
+        /* Hide the title text container initially */
+        .animated-h1 {
+            opacity: 0; 
+        }
+        
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+
+        /* The typewriter cursor effect */
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: #66fcf1; }
+        }
+        /* END New CSS for Typing Animation */
+
+        /* 1. Scroll animation initial state (fade up/in) */
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .animate-on-scroll.in-view {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* REQUIRED CHANGE 1: Video Styling for Hero Background (using a placeholder video link) */
+        .hero-bg {
+            position: relative; 
+            overflow: hidden;
+        }
+        
+        .background-video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: 1; 
+            transform: translate(-50%, -50%);
+            object-fit: cover; 
+        }
+        
+        /* Dark Overlay for readability */
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2; 
+            /* qr-dark-bg (#1f2833) with opacity 60% */
+            background: rgba(31, 40, 51, 0.6); 
+        }
+        /* END REQUIRED CHANGE 1 */
+
+        /* 9. Button/Interactive elements hover/active styles */
+        .interactive-btn {
+            transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+        .interactive-btn:hover {
+            transform: translateY(-2px);
+            /* Primary color shadow for depth (#66fcf1) */
+            box-shadow: 0 12px 25px rgba(102, 252, 241, 0.4); 
+        }
+        .interactive-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 10px rgba(102, 252, 241, 0.4);
+        }
+        
+        /* Card Hover Animation */
+        .card-animate {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-animate:hover {
+            transform: scale(1.03);
+            /* Shadow color using the new text light color */
+            box-shadow: 0 20px 30px rgba(197, 198, 199, 0.05); 
+        }
+
+        /* Fix for qrcode.js canvas element styling */
+        #qrCode canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.75rem; /* rounded-xl */
+        }
+        
+        /* 10. Footer Styling Override (Ensure colors are correct) */
+        #contact {
+            background-color: #1f2833 !important; /* Footer background: qr-dark-bg */
+        }
+        /* Set all footer content to pure white */
+        #contact, 
+        #contact p, 
+        #contact a, 
+        #contact li, 
+        #contact svg {
+            color: #ffffff !important; /* Footer text: white */
+        }
+        
+        /* Keep original highlight color for specific headers and logo accent */
+        #contact h5 {
+            color: #66fcf1 !important; /* Keep qr-primary for headers */
+        }
+        #contact a:hover {
+            color: #66fcf1 !important; /* Keep qr-accent/primary for hover */
+        }
+        #contact .text-qr-accent {
+            color: #66fcf1 !important; /* Keep qr-accent for logo part */
+        }
+
+        /* REQUIRED FIX: Feature Boxes Styling Override */
+        #about .card-animate {
+            background-color: #1f2833 !important; /* Background: qr-dark-bg */
+        }
+        #about .card-animate h3,
+        #about .card-animate p {
+            color: #ffffff !important; /* Text: white */
+        }
+    </style>
+</head>
+
+<body class="bg-qr-dark-bg text-qr-text-light font-sans">
+
+    <div id="messageModal" class="fixed inset-0 z-50 flex items-start justify-center pt-8 pointer-events-none hidden">
+        <div id="modalContent" class="p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 opacity-95">
+            <p id="messageText" class="font-medium"></p>
+        </div>
+    </div>
+
+    <header id="mainHeader" class="sticky top-0 z-40 bg-qr-dark-bg shadow-2xl shadow-black/50 border-b border-qr-primary/30 transition-transform duration-300 ease-in-out">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex-shrink-0">
+                    <a href="#home" class="text-3xl font-extrabold text-qr-text-light tracking-wider text-qr-hub">
+                        QR<span class="text-qr-accent">Hub</span>
+                    </a>
+                </div>
+                
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-6">
+                        <a href="#about" class="text-qr-text-light/70 hover:bg-qr-primary hover:text-qr-dark-bg px-3 py-2 rounded-lg text-lg font-medium interactive-btn">About</a>
+                        <a href="#generator" class="text-qr-text-light/70 hover:bg-qr-primary hover:text-qr-dark-bg px-3 py-2 rounded-lg text-lg font-medium interactive-btn">QR Generator</a>
+                        <a href="#contact" class="text-qr-text-light/70 hover:bg-qr-primary hover:text-qr-dark-bg px-3 py-2 rounded-lg text-lg font-medium interactive-btn">Contact</a>
+                        <a href="#generator" class="bg-qr-primary text-qr-dark-bg px-4 py-2 rounded-xl text-lg font-bold shadow-md interactive-btn ml-4">
+                            Start Coding
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="-mr-2 flex md:hidden">
+                    <button id="menu-toggle" type="button" class="bg-qr-dark-bg inline-flex items-center justify-center p-2 rounded-md text-qr-primary hover:text-qr-text-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-qr-dark-bg focus:ring-qr-primary transition-all duration-300" aria-controls="mobile-menu" aria-expanded="false">
+                        <span class="sr-only">Open main menu</span>
+                        <i id="icon-open" data-lucide="menu" class="block h-6 w-6"></i>
+                        <i id="icon-close" data-lucide="x" class="hidden h-6 w-6"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <div id="mobile-menu" class="hidden md:hidden opacity-0 scale-95 origin-top-right transition-all duration-300 bg-qr-dark-bg/95 backdrop-blur-sm">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#about" class="text-qr-text-light/70 hover:bg-qr-primary hover:text-qr-dark-bg block px-3 py-2 rounded-md text-base font-medium">About</a>
+                <a href="#generator" class="text-qr-text-light/70 hover:bg-qr-primary hover:text-qr-dark-bg block px-3 py-2 rounded-md text-base font-medium">QR Generator</a>
+                <a href="#contact" class="text-qr-text-light/70 hover:bg-qr-primary hover:text-qr-dark-bg block px-3 py-2 rounded-md text-base font-medium">Contact</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section id="home" class="hero-bg py-24 md:py-32 overflow-hidden border-b-4 border-qr-primary/50 relative">
+            
+            <video autoplay muted loop playsinline class="background-video">
+                <source src="https://assets.mixkit.co/videos/preview/mixkit-abstract-blue-lines-moving-over-a-black-background-4735-large.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+            </video>
+            
+            <div class="video-overlay"></div>
+
+            <div class="container mx-auto px-4 text-center relative z-10">
+                <h1 id="mainTitle" class="text-5xl sm:text-7xl font-extrabold text-white mb-4 text-qr-hub">
+                    <span id="typedText" class="typing-container animated-h1">The Instant QR Hub!</span>
+                </h1>
+                
+                <p id="subTagline" class="text-xl sm:text-2xl text-white mb-10 max-w-3xl mx-auto opacity-0 transition-opacity duration-1000">
+                    Generate QR codes instantly and creatively
+                </p>
+                
+                <a href="#generator" id="hero-cta" class="inline-block interactive-btn bg-qr-primary text-qr-dark-bg text-xl font-bold px-10 py-4 rounded-full shadow-lg hover:shadow-2xl transition duration-300 animate-on-scroll" style="transition-delay: 0.4s;">
+                    Generate Your Code <i data-lucide="arrow-right" class="w-5 h-5 inline-block ml-2 -mt-1"></i>
+                </a>
+            </div>
+        </section>
+
+        <section id="generator" class="py-16 md:py-24 bg-qr-dark-bg border-b border-qr-text-light/10">
+            <div class="container mx-auto px-4">
+                <div class="text-center mb-12 animate-on-scroll">
+                    <h2 class="text-4xl sm:text-5xl font-extrabold text-qr-text-light text-qr-hub mb-3">Code Generator</h2>
+                    <p class="text-lg text-qr-text-light">Paste your link or message to get started.</p>
+                </div>
+
+                <div class="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+                    
+                    <div class="p-6 bg-qr-dark-bg rounded-2xl shadow-xl shadow-black/50 animate-on-scroll" style="transition-delay: 0.2s;">
+                        <h3 class="text-2xl font-bold mb-4 flex items-center text-qr-accent">
+                            <i data-lucide="link" class="w-6 h-6 mr-2"></i> Content Input
+                        </h3>
+                        
+                        <div class="mb-6">
+                            <label for="urlInput" class="block text-lg font-medium text-qr-text-light mb-2">URL or Text to Encode</label>
+                            <input type="text" id="urlInput" value="" placeholder="e.g., https://yourwebsite.com" class="w-full p-4 border-2 border-qr-primary/50 bg-qr-dark-bg text-qr-text-light rounded-xl focus:ring-qr-primary focus:border-qr-primary transition duration-200 shadow-inner text-lg">
+                        </div>
+                        
+                        <button id="generateBtn" class="interactive-btn w-full bg-qr-primary text-qr-dark-bg text-xl font-bold py-4 rounded-xl shadow-lg hover:shadow-2xl transition duration-300 flex items-center justify-center">
+                            Generate QR Code <i data-lucide="scan" class="w-6 h-6 ml-3"></i>
+                        </button>
+                    </div>
+
+                    <div id="qrPreviewBox" class="p-8 bg-qr-dark-bg rounded-2xl shadow-2xl shadow-black/50 border-4 border-qr-accent/50 text-center flex flex-col items-center justify-center hidden animate-on-scroll transition-all duration-700 ease-out">
+                        <h3 class="text-2xl font-bold mb-4 text-qr-primary">Scan Your Custom Code!</h3>
+                        
+                        <div id="qrCode" class="p-4 bg-white border border-qr-primary/50 rounded-xl shadow-inner mb-6 transition-all duration-500 transform scale-100">
+                            <div class="text-qr-text-light/50 italic p-16 text-center">
+                                No QR Code generated yet.
+                            </div>
+                        </div>
+
+                        <button id="downloadBtn" class="interactive-btn bg-qr-accent text-qr-dark-bg text-lg font-bold px-8 py-3 rounded-full shadow-md hover:shadow-xl hover:bg-qr-primary/80 transition duration-300 opacity-0 pointer-events-none">
+                            Download QR Code <i data-lucide="download" class="w-5 h-5 inline-block ml-2 -mt-1"></i>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <section id="about" class="py-16 md:py-24 bg-qr-dark-bg border-b border-qr-text-light/10 overflow-hidden">
+            <div class="container mx-auto px-4">
+                <div class="text-center mb-12 animate-on-scroll">
+                    <h2 class="text-4xl sm:text-5xl font-extrabold text-qr-text-light text-qr-hub mb-3">Elevate Your Digital Links</h2>
+                    <p class="text-lg text-qr-text-light">We blend simplicity with professional-grade technology.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    
+                    <div class="card-animate p-8 bg-qr-dark-bg rounded-3xl shadow-xl shadow-black/50 border-t-4 border-qr-primary animate-on-scroll">
+                        <i data-lucide="infinity" class="w-12 h-12 text-qr-primary mb-4 block transform rotate-12 transition-transform duration-300"></i>
+                        <h3 class="text-2xl font-bold mb-3 text-white">Forever Free</h3>
+                        <p class="text-white">No subscriptions, no hidden fees. Generate as many high-quality, non-expiring codes as you need, forever.</p>
+                    </div>
+
+                    <div class="card-animate p-8 bg-qr-dark-bg rounded-3xl shadow-xl shadow-black/50 border-t-4 border-qr-accent animate-on-scroll" style="transition-delay: 0.2s;">
+                        <i data-lucide="shield-check" class="w-12 h-12 text-qr-accent mb-4 block transform hover:scale-110 transition-transform duration-300"></i>
+                        <h3 class="text-2xl font-bold mb-3 text-white">Client-Side Secure</h3>
+                        <p class="text-white">Your data never leaves your browser. Generation is instant and 100% private and secure.</p>
+                    </div>
+
+                    <div class="card-animate p-8 bg-qr-dark-bg rounded-3xl shadow-xl shadow-black/50 border-t-4 border-qr-primary animate-on-scroll" style="transition-delay: 0.4s;">
+                        <i data-lucide="download-cloud" class="w-12 h-12 text-qr-primary mb-4 block transform hover:rotate-3 transition-transform duration-300"></i>
+                        <h3 class="text-2xl font-bold mb-3 text-white">High-Resolution Export</h3>
+                        <p class="text-white">Download codes in PNG format, perfectly sized for print or digital use without any quality loss.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="how-it-works" class="py-16 md:py-24 bg-qr-dark-bg">
+            <div class="container mx-auto px-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                    
+                    <div class="animate-on-scroll">
+                        <h2 class="text-4xl font-extrabold text-qr-text-light text-qr-hub mb-6">Simple Steps to Digital Connection</h2>
+                        <p class="text-xl text-qr-text-light mb-8">It only takes three quick steps to turn your link into a scannable masterpiece.</p>
+                        
+                        <ol class="space-y-6">
+                            <li class="flex items-start group">
+                                <span class="text-2xl font-extrabold p-3 rounded-full bg-qr-primary text-qr-dark-bg mr-4 transition-all duration-300 group-hover:scale-110">1</span>
+                                <div>
+                                    <h4 class="text-2xl font-bold text-qr-text-light mb-1">Input Data</h4>
+                                    <p class="text-qr-text-light">Paste your desired URL, text, or contact details into the generator box.</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start group">
+                                <span class="text-2xl font-extrabold p-3 rounded-full bg-qr-accent text-qr-dark-bg mr-4 transition-all duration-300 group-hover:scale-110">2</span>
+                                <div>
+                                    <h4 class="text-2xl font-bold text-qr-text-light mb-1">Click & Create</h4>
+                                    <p class="text-qr-text-light">Hit 'Generate' and watch the QR code appear instantly for preview.</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start group">
+                                <span class="text-2xl font-extrabold p-3 rounded-full bg-qr-primary text-qr-dark-bg mr-4 transition-all duration-300 group-hover:scale-110">3</span>
+                                <div>
+                                    <h4 class="text-2xl font-bold text-qr-text-light mb-1">Download & Distribute</h4>
+                                    <p class="text-qr-text-light">Download the file and integrate your code seamlessly into your projects.</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div class="flex justify-center items-center p-8 bg-qr-primary/10 rounded-3xl shadow-2xl shadow-black/50 relative overflow-hidden animate-on-scroll" style="transition-delay: 0.2s;">
+                        <i data-lucide="square-code" class="w-48 h-48 text-qr-primary/30 animate-pulse absolute inset-0 m-auto"></i>
+                        <div class="w-full max-w-sm p-6 bg-qr-dark-bg rounded-xl shadow-2xl relative z-10 transform hover:rotate-2 transition duration-500">
+                            <div class="flex items-center space-x-2 mb-4">
+                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                            </div>
+                            <div class="h-32 bg-qr-dark-bg/90 rounded-lg flex items-center justify-center text-qr-text-light font-mono text-xs overflow-hidden relative">
+                                <span class="animate-[pulse_2s_infinite]">...Securing Data Channel...</span>
+                                <div class="absolute bottom-0 w-full h-1 bg-qr-accent animate-ping opacity-75"></div>
+                            </div>
+                            <p class="mt-4 text-sm text-qr-text-light/50 text-center">100% Client-Side Processing</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer id="contact" class="bg-qr-dark-bg text-qr-text-light py-12 border-t border-qr-primary/30">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 border-b border-qr-text-light/10 pb-8 mb-8">
+                
+                <div>
+                    <a href="#home" class="text-3xl font-extrabold text-white tracking-wider text-qr-hub">
+                        QR<span class="text-qr-accent">Hub</span>
+                    </a>
+                    <p class="text-white mt-2 text-sm">Simplifying the connection between print and digital.</p>
+                </div>
+
+                <div>
+                    <h5 class="text-xl font-bold mb-3 text-qr-primary">Quick Links</h5>
+                    <ul class="space-y-2 text-white/70">
+                        <li><a href="#generator" class="hover:text-qr-accent transition duration-200">Generator</a></li>
+                        <li><a href="#about" class="hover:text-qr-accent transition duration-200">Features</a></li>
+                        <li><a href="#" class="hover:text-qr-accent transition duration-200">Support</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h5 class="text-xl font-bold mb-3 text-qr-primary">Get In Touch</h5>
+                    <ul class="space-y-2 text-white/70">
+                        <li class="flex items-center"><i data-lucide="mail" class="w-4 h-4 mr-2 text-qr-accent"></i> Connect.aliyansaleem@gmail.com</li>
+                        <li class="flex items-center"><i data-lucide="phone" class="w-4 h-4 mr-2 text-qr-accent"></i>+92 (370) 025-6087</li>
+                        <li class="flex items-center"><i data-lucide="map-pin" class="w-4 h-4 mr-2 text-qr-accent"></i>Karachi , Pakistan</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h5 class="text-xl font-bold mb-3 text-qr-primary">Connect</h5>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-white/70 hover:text-qr-accent transition-all duration-300 transform hover:scale-125 interactive-btn p-1 rounded-full"><i data-lucide="instagram" class="w-6 h-6"></i></a>
+                        <a href="#" class="text-white/70 hover:text-qr-accent transition-all duration-300 transform hover:scale-125 interactive-btn p-1 rounded-full"><i data-lucide="twitter" class="w-6 h-6"></i></a>
+                        <a href="#" class="text-white/70 hover:text-qr-accent transition-all duration-300 transform hover:scale-125 interactive-btn p-1 rounded-full"><i data-lucide="linkedin" class="w-6 h-6"></i></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center text-sm text-white/50 pt-4">
+                &copy; 2024 QR Hub. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Global Utility Functions
+        function showMessage(text, type = 'info') {
+            const modal = document.getElementById('messageModal');
+            const messageText = document.getElementById('messageText');
+            const modalContent = document.getElementById('modalContent');
+
+            messageText.textContent = text;
+            
+            // Apply theme colors for modal feedback
+            modalContent.classList.remove('bg-qr-primary/20', 'bg-red-900', 'text-qr-text-light', 'text-red-400', 'bg-qr-dark-bg');
+            modalContent.classList.add(
+                type === 'error' ? 'bg-qr-dark-bg' : 'bg-qr-primary/20', 
+                type === 'error' ? 'text-qr-primary' : 'text-qr-text-light' 
+            );
+
+            // Show and reset animation
+            modal.classList.remove('hidden');
+            modal.style.opacity = 0;
+            setTimeout(() => { modal.style.opacity = 1; }, 10);
+
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                modal.style.opacity = 0;
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300); 
+            }, 3000);
+        }
+
+        // --- HEADER SCROLL LOGIC ---
+        let lastScrollY = window.scrollY;
+        const mainHeader = document.getElementById('mainHeader');
+        
+        window.addEventListener('scroll', () => {
+            const currentScrollY = window.scrollY;
+            
+            // Hide header if scrolling down and past the top section
+            if (currentScrollY > lastScrollY && currentScrollY > 100) {
+                mainHeader.classList.add('-translate-y-full');
+            } else {
+                // Show header if scrolling up or near top
+                mainHeader.classList.remove('-translate-y-full');
+            }
+            
+            lastScrollY = currentScrollY;
+        });
+        // --- END HEADER SCROLL LOGIC ---
+
+
+        // --- QR GENERATION LOGIC ---
+        const qrCodeContainer = document.getElementById('qrCode');
+        let qrcodeInstance = null; 
+
+        function generateQRCode() {
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
+            const generateButton = document.getElementById('generateBtn');
+
+            if (!url) {
+                showMessage('Please enter a URL or text to generate a QR code.', 'error');
+                return;
+            }
+
+            // Visual feedback: pulse button and show loading state
+            generateButton.classList.add('animate-pulse', 'bg-qr-primary/70');
+            generateButton.innerHTML = 'Generating... <i data-lucide="loader-2" class="w-6 h-6 ml-3 animate-spin"></i>';
+            lucide.createIcons(); 
+
+            // Clear previous QR code elements
+            qrCodeContainer.innerHTML = '';
+            
+            if (qrcodeInstance) {
+                qrcodeInstance = null; 
+            }
+
+            // Initialize qrcodeInstance (colorDark set to theme's dark background)
+            qrcodeInstance = new QRCode(qrCodeContainer, {
+                text: url,
+                width: 256,
+                height: 256,
+                colorDark : "#1f2833", 
+                colorLight : "#ffffff", 
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            // Simulate slight delay for visual effect
+            setTimeout(() => {
+                // Remove loading state
+                generateButton.classList.remove('animate-pulse', 'bg-qr-primary/70');
+                generateButton.innerHTML = 'Generate QR Code <i data-lucide="scan" class="w-6 h-6 ml-3"></i>';
+                lucide.createIcons();
+                
+                // Show the download button and preview box with animation
+                const previewBox = document.getElementById('qrPreviewBox');
+                const downloadBtn = document.getElementById('downloadBtn');
+
+                // Ensure preview box is visible
+                previewBox.classList.remove('hidden');
+                
+                // Animate visibility for download button
+                downloadBtn.classList.remove('opacity-0', 'pointer-events-none');
+                downloadBtn.classList.add('opacity-100');
+
+                showMessage('QR Code generated successfully!', 'info');
+
+            }, 700);
+        }
+
+        function downloadQRCode() {
+            const downloadButton = document.getElementById('downloadBtn');
+            if (!qrcodeInstance || qrCodeContainer.innerHTML === '') {
+                showMessage('Generate a QR code first!', 'error');
+                return;
+            }
+
+            const canvas = qrCodeContainer.querySelector('canvas');
+            if (canvas) {
+                // Create higher resolution canvas for download
+                const tempCanvas = document.createElement('canvas');
+                const scale = 4; 
+                tempCanvas.width = canvas.width * scale;
+                tempCanvas.height = canvas.height * scale;
+                const ctx = tempCanvas.getContext('2d');
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height); 
+                ctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+                
+                const dataURL = tempCanvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = 'QRHub_Code.png';
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // Add visual feedback
+                downloadButton.innerHTML = 'Downloaded! <i data-lucide="check" class="w-5 h-5 inline-block ml-2 -mt-1"></i>';
+                downloadButton.classList.remove('bg-qr-accent', 'hover:bg-qr-primary/80');
+                downloadButton.classList.add('bg-qr-primary', 'hover:bg-qr-primary/80', 'animate-pulse');
+                lucide.createIcons();
+
+                setTimeout(() => {
+                    downloadButton.innerHTML = 'Download QR Code <i data-lucide="download" class="w-5 h-5 inline-block ml-2 -mt-1"></i>';
+                    downloadButton.classList.remove('bg-qr-primary', 'hover:bg-qr-primary/80', 'animate-pulse');
+                    downloadButton.classList.add('bg-qr-accent', 'hover:bg-qr-primary/80');
+                    lucide.createIcons();
+                }, 1500);
+
+            } else {
+                showMessage('Could not find QR image data for download. Please generate the code first.', 'error');
+            }
+        }
+        // --- END QR GENERATION LOGIC ---
+
+
+        // --- UI INTERACTION LOGIC ---
+        
+        // 1. Hamburger Menu Toggle
+        const menuButton = document.getElementById('menu-toggle');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const iconOpen = document.getElementById('icon-open');
+        const iconClose = document.getElementById('icon-close');
+
+        menuButton.addEventListener('click', () => {
+            // Toggle menu visibility and scale for smooth effect
+            mobileMenu.classList.toggle('opacity-0');
+            mobileMenu.classList.toggle('scale-95');
+            mobileMenu.classList.toggle('hidden');
+
+            // Toggle icons
+            iconOpen.classList.toggle('hidden');
+            iconClose.classList.toggle('hidden');
+        });
+
+        // Close mobile menu when a link is clicked
+        document.querySelectorAll('#mobile-menu a').forEach(link => {
+            link.addEventListener('click', () => {
+                if (!mobileMenu.classList.contains('hidden')) {
+                    mobileMenu.classList.add('opacity-0', 'scale-95');
+                    setTimeout(() => {
+                         mobileMenu.classList.add('hidden');
+                         iconOpen.classList.remove('hidden');
+                         iconClose.classList.add('hidden');
+                    }, 300); 
+                }
+            });
+        });
+
+        // 2. Intersection Observer for Scroll Animations
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.1 
+            };
+
+            const observer = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('in-view');
+                        observer.unobserve(entry.target); 
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.animate-on-scroll').forEach(element => {
+                observer.observe(element);
+            });
+
+            // Set up QR Code events
+            document.getElementById('urlInput').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    generateQRCode();
+                }
+            });
+            document.getElementById('generateBtn').addEventListener('click', generateQRCode);
+            document.getElementById('downloadBtn').addEventListener('click', downloadQRCode);
+
+            // --- HERO TYPING ANIMATION LOGIC ---
+            function runHeroAnimation() {
+                const typedTextElement = document.getElementById('typedText');
+                const subTagline = document.getElementById('subTagline');
+                
+                // 1. Start typing animation
+                typedTextElement.classList.remove('animated-h1');
+                typedTextElement.style.opacity = 1; 
+
+                // 2. Wait for typing animation to complete
+                setTimeout(() => {
+                    // Stop blinking cursor
+                    typedTextElement.style.borderRightColor = 'transparent'; 
+                    
+                    // 3. Reveal the tagline
+                    subTagline.classList.remove('opacity-0');
+
+                }, 3000); 
+            }
+
+            runHeroAnimation();
+            // --- END HERO TYPING ANIMATION LOGIC ---
+        });
+    </script>
+</body>
+</html>
