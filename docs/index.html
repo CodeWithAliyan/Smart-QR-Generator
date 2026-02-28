@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Hub — Instant QR Code Generator</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/jpg" href="favicon.jpg">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- qr-code-styling (modern — replaces qrcodejs) -->
+    <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.6.0-rc.1/lib/qr-code-styling.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Fonts: Syne (display) + DM Sans (body) -->
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <!-- Tailwind theme config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'qr-primary':   '#66fcf1',
+                        'qr-accent':    '#66fcf1',
+                        'qr-dark-bg':   '#0b0c10',
+                        'qr-surface':   '#1f2833',
+                        'qr-surface-2': '#17202b',
+                        'qr-border':    '#2a3a4a',
+                        'qr-text':      '#c5c6c7',
+                    },
+                    fontFamily: {
+                        'display': ['Syne', 'sans-serif'],
+                        'body':    ['DM Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ── Base ─────────────────────────────────────────── */
+        :root { scroll-behavior: smooth; }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+        .font-display { font-family: 'Syne', sans-serif; }
+
+        /* ── Hero background (animated grid + glow) ─────── */
+        .hero-bg {
+            position: relative;
+            overflow: hidden;
+            background: #0b0c10;
+        }
+        .hero-bg::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                radial-gradient(ellipse 80% 55% at 50% -5%, rgba(102,252,241,0.12) 0%, transparent 70%),
+                linear-gradient(rgba(42,58,74,0.35) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(42,58,74,0.35) 1px, transparent 1px);
+            background-size: 100% 100%, 58px 58px, 58px 58px;
+            mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 35%, transparent 100%);
+            pointer-events: none; z-index: 0;
+        }
+        .hero-glow {
+            position: absolute; border-radius: 50%;
+            filter: blur(88px); pointer-events: none; z-index: 0;
+        }
+        .glow-1 {
+            width: 560px; height: 560px;
+            background: radial-gradient(circle, rgba(102,252,241,0.1) 0%, transparent 70%);
+            top: -160px; left: 50%; transform: translateX(-50%);
+        }
+        .glow-2 {
+            width: 320px; height: 320px;
+            background: radial-gradient(circle, rgba(56,189,248,0.07) 0%, transparent 70%);
+            top: 45%; left: 8%;
+        }
+
+        /* ── Hero gradient text ─────────────────────────── */
+        .hero-gradient-text {
+            background: linear-gradient(125deg, #66fcf1 0%, #45a7ff 55%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        /* Blinking cursor on hero title */
+        .typing-cursor::after {
+            content: '|'; color: #66fcf1;
+            animation: blink 0.85s step-end infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* ── Page-load entry animations ─────────────────── */
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes floatBob {
+            0%, 100% { transform: translateY(0); }
+            50%       { transform: translateY(-11px); }
+        }
+        .anim-1 { animation: fadeSlideUp 0.7s 0.0s ease forwards; opacity: 0; }
+        .anim-2 { animation: fadeSlideUp 0.7s 0.15s ease forwards; opacity: 0; }
+        .anim-3 { animation: fadeSlideUp 0.7s 0.3s  ease forwards; opacity: 0; }
+        .anim-4 { animation: fadeSlideUp 0.7s 0.45s ease forwards; opacity: 0; }
+        .anim-float { animation: floatBob 4.4s ease-in-out infinite; }
+
+        /* ── Scroll-reveal ──────────────────────────────── */
+        .animate-on-scroll {
+            opacity: 0; transform: translateY(32px);
+            transition: opacity 0.75s cubic-bezier(0.25,0.46,0.45,0.94),
+                        transform 0.75s cubic-bezier(0.25,0.46,0.45,0.94);
+        }
+        .animate-on-scroll.in-view { opacity: 1; transform: translateY(0); }
+
+        /* ── Interactive button (lift + glow) ───────────── */
+        .interactive-btn {
+            transition: transform 0.22s cubic-bezier(0.165,0.84,0.44,1),
+                        box-shadow 0.22s cubic-bezier(0.165,0.84,0.44,1),
+                        background-color 0.2s, border-color 0.2s, opacity 0.2s;
+        }
+        .interactive-btn:hover:not([disabled]) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(102,252,241,0.28);
+        }
+        .interactive-btn:active:not([disabled]) {
+            transform: translateY(0);
+            box-shadow: 0 4px 10px rgba(102,252,241,0.18);
+        }
+        .interactive-btn[disabled] { opacity: 0.32; cursor: not-allowed; }
+
+        /* ── Card hover ─────────────────────────────────── */
+        .card-animate {
+            transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+        }
+        .card-animate:hover { transform: translateY(-4px); box-shadow: 0 22px 44px rgba(0,0,0,0.42); }
+
+        /* ── Nav links ──────────────────────────────────── */
+        .nav-link {
+            padding: 0.38rem 0.8rem; border-radius: 8px;
+            color: rgba(197,198,199,0.7); font-size: 0.88rem;
+            transition: color 0.2s, background 0.2s;
+        }
+        .nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+
+        /* ── Logo mark ──────────────────────────────────── */
+        .logo-mark {
+            width: 34px; height: 34px; border-radius: 9px;
+            background: #66fcf1;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* ── Feature icon ───────────────────────────────── */
+        .feat-icon {
+            width: 46px; height: 46px; border-radius: 13px;
+            background: rgba(102,252,241,0.08);
+            border: 1px solid rgba(102,252,241,0.2);
+            color: #66fcf1;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── Generator cards ────────────────────────────── */
+        .gen-card {
+            background: #1f2833; border: 1px solid #2a3a4a; border-radius: 1.25rem; padding: 1.4rem;
+        }
+        .gen-label {
+            display: block; font-family: 'Syne', sans-serif;
+            font-size: 0.72rem; font-weight: 800;
+            text-transform: uppercase; letter-spacing: 0.16em;
+            color: #c5c6c7; margin-bottom: 0.7rem;
+        }
+
+        /* ── Input ──────────────────────────────────────── */
+        .qr-input {
+            width: 100%; padding: 0.85rem 1rem;
+            background: #0b0c10; border: 2px solid #2a3a4a;
+            border-radius: 0.75rem; color: #fff; font-size: 0.95rem;
+            transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+        }
+        .qr-input::placeholder { color: rgba(197,198,199,0.28); }
+        .qr-input:focus {
+            border-color: #66fcf1;
+            box-shadow: 0 0 0 3px rgba(102,252,241,0.12);
+        }
+
+        /* ── Color swatch row ───────────────────────────── */
+        .swatch-row {
+            display: flex; align-items: center; gap: 0.65rem;
+            padding: 0.42rem 0.75rem;
+            background: #0b0c10; border: 1.5px solid #2a3a4a; border-radius: 0.65rem;
+            cursor: pointer; transition: border-color 0.2s;
+        }
+        .swatch-row:hover { border-color: rgba(102,252,241,0.45); }
+        .swatch-row input[type="color"] {
+            width: 26px; height: 26px; border: none; border-radius: 5px;
+            cursor: pointer; background: none; padding: 0;
+        }
+        .swatch-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        .swatch-row input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+
+        /* ── Style-picker buttons ───────────────────────── */
+        .style-btn {
+            padding: 0.42rem 0.3rem;
+            background: #0b0c10; border: 1.5px solid #2a3a4a; border-radius: 0.55rem;
+            color: #c5c6c7; font-size: 0.72rem;
+            font-family: 'Syne', sans-serif; font-weight: 700;
+            cursor: pointer; text-align: center; transition: all 0.18s;
+        }
+        .style-btn:hover { border-color: rgba(102,252,241,0.5); color: #fff; }
+        .style-btn.active {
+            border-color: #66fcf1; color: #66fcf1;
+            background: rgba(102,252,241,0.07);
+        }
+
+        /* ── Download buttons ───────────────────────────── */
+        .dl-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+            padding: 0.72rem 0.9rem; border-radius: 0.75rem;
+            font-family: 'Syne', sans-serif; font-size: 0.78rem; font-weight: 800;
+            cursor: pointer; border: 1.5px solid; transition: all 0.2s;
+        }
+        .dl-btn-png { background: rgba(102,252,241,0.08); border-color: rgba(102,252,241,0.3); color: #66fcf1; }
+        .dl-btn-svg { background: rgba(56,189,248,0.08);  border-color: rgba(56,189,248,0.3);  color: #38bdf8; }
+        .dl-btn:hover:not([disabled]) { filter: brightness(1.15); transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.35); }
+        .dl-btn[disabled] { opacity: 0.3; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+        /* ── QR canvas / svg sizing ─────────────────────── */
+        #qrCode canvas, #qrCode svg { max-width: 100%; border-radius: 10px; display: block; }
+
+        /* ── How-step badge ─────────────────────────────── */
+        .step-badge {
+            flex-shrink: 0; width: 44px; height: 44px; border-radius: 13px;
+            background: #66fcf1; color: #0b0c10;
+            font-family: 'Syne', sans-serif; font-weight: 900; font-size: 1.1rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── Toast ──────────────────────────────────────── */
+        #toast {
+            position: fixed; top: 1.4rem; left: 50%;
+            transform: translateX(-50%) translateY(-6px);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.28s, transform 0.28s;
+            z-index: 9999;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+
+        /* ── Footer ─────────────────────────────────────── */
+        .footer-link { color: rgba(197,198,199,0.6); transition: color 0.2s; }
+        .footer-link:hover { color: #66fcf1; }
+        .social-btn {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: #17202b; border: 1px solid #2a3a4a;
+            color: #c5c6c7; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .social-btn:hover { color: #66fcf1; border-color: rgba(102,252,241,0.4); transform: translateY(-2px); }
+
+        /* ── Scrollbar ──────────────────────────────────── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #0b0c10; }
+        ::-webkit-scrollbar-thumb { background: #2a3a4a; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(102,252,241,0.3); }
+
+        /* Mobile menu transitions */
+        #mobile-menu {
+            transition: all 0.3s ease-in-out;
+            transform-origin: top;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        
+        #mobile-menu:not(.hidden) {
+            max-height: 400px;
+            opacity: 1;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+        
+        #mobile-menu.hidden {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-top: 0;
+            margin-bottom: 0;
+            border: none;
+        }
+        
+        /* Ensure the menu content is visible during transition */
+        #mobile-menu .px-5 {
+            transition: opacity 0.2s ease;
+        }
+        
+        #mobile-menu.hidden .px-5 {
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body class="bg-qr-dark-bg text-qr-text" style="font-family:'DM Sans',sans-serif;">
+
+    <!-- ── Toast notification ──────────────────────────────── -->
+    <div id="toast">
+        <div id="toastInner"
+             class="flex items-center gap-2.5 px-5 py-3 rounded-xl border shadow-2xl shadow-black/60 text-sm font-display">
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════
+         HEADER
+    ════════════════════════════════════════════════════════ -->
+    <header id="mainHeader"
+            class="sticky top-0 z-50 border-b border-qr-border transition-transform duration-300 ease-in-out"
+            style="background:rgba(11,12,16,0.88);backdrop-filter:blur(18px);">
+        <nav class="container mx-auto px-5 sm:px-7 lg:px-10">
+            <div class="flex items-center justify-between py-4">
+
+                <!-- Logo -->
+                <a href="#home" class="flex items-center gap-2.5">
+                    <div class="logo-mark">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b0c10" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/><path d="m14 14 3 3m0-3-3 3"/><path d="M17 14h4v4h-4z"/>
+                        </svg>
+                    </div>
+                    <span class="font-display text-2xl font-black text-white tracking-tight">
+                        QR<span class="text-qr-primary">Hub</span>
+                    </span>
+                </a>
+
+                <!-- Desktop nav -->
+                <div class="hidden md:flex items-center gap-1">
+                    <a href="#about"     class="nav-link">Features</a>
+                    <a href="#generator" class="nav-link">Generator</a>
+                    <a href="#how"       class="nav-link">How It Works</a>
+                    <a href="#contact"   class="nav-link">Contact</a>
+                    <a href="#generator"
+                       class="interactive-btn ml-3 px-5 py-2 bg-qr-primary text-qr-dark-bg font-display font-black text-sm rounded-full">
+                        Start Free →
+                    </a>
+                </div>
+
+                <!-- Mobile toggle -->
+                <button id="menu-toggle" class="md:hidden text-qr-text hover:text-white p-2 rounded-lg transition-colors z-50">
+                    <i id="icon-open" data-lucide="menu" class="w-6 h-6 block"></i>
+                    <i id="icon-close" data-lucide="x" class="w-6 h-6 hidden"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-qr-border bg-qr-surface w-full">
+            <div class="px-5 py-4 flex flex-col gap-0.5">
+                <a href="#about" class="block py-2.5 text-qr-text hover:text-qr-primary transition-colors text-sm font-display border-b border-qr-border">Features</a>
+                <a href="#generator" class="block py-2.5 text-qr-text hover:text-qr-primary transition-colors text-sm font-display border-b border-qr-border">Generator</a>
+                <a href="#how" class="block py-2.5 text-qr-text hover:text-qr-primary transition-colors text-sm font-display border-b border-qr-border">How It Works</a>
+                <a href="#contact" class="block py-2.5 text-qr-text hover:text-qr-primary transition-colors text-sm font-display">Contact</a>
+                <a href="#generator" class="interactive-btn mt-3 px-5 py-3 bg-qr-primary text-qr-dark-bg font-display font-black rounded-full text-center text-sm">
+                    Start Free →
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+
+        <!-- ════════════════════════════════════════════════════
+             HERO
+        ════════════════════════════════════════════════════ -->
+        <section id="home" class="hero-bg min-h-[91vh] flex flex-col items-center justify-center py-24 md:py-36">
+            <div class="hero-glow glow-1"></div>
+            <div class="hero-glow glow-2"></div>
+
+            <div class="container mx-auto px-5 sm:px-7 lg:px-10 text-center relative z-10">
+
+                <!-- Badge -->
+                <div class="anim-1 inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-8"
+                     style="border-color:rgba(102,252,241,0.3);background:rgba(102,252,241,0.07);color:#66fcf1;font-size:0.72rem;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:0.04em;">
+                    <span class="w-1.5 h-1.5 rounded-full bg-qr-primary animate-pulse"></span>
+                    100% Free · Client-Side · No Sign-Up Required
+                </div>
+
+                <!-- Headline -->
+                <h1 class="anim-2 font-display font-black text-white leading-[0.88] tracking-tighter mb-6"
+                    style="font-size:clamp(3rem,9vw,6.5rem);">
+                    The Instant<br>
+                    <span class="hero-gradient-text typing-cursor">QR Hub</span>
+                </h1>
+
+                <p class="anim-3 text-lg sm:text-xl text-qr-text max-w-2xl mx-auto mb-10 leading-relaxed">
+                    Generate beautiful, customisable QR codes in seconds. Live preview, custom colours,
+                    multiple dot styles, and PNG&thinsp;/&thinsp;SVG download — all in your browser.
+                </p>
+
+                <!-- CTAs -->
+                <div class="anim-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="#generator"
+                       class="interactive-btn inline-flex items-center gap-2 px-9 py-4 bg-qr-primary text-qr-dark-bg font-display font-black text-base rounded-full"
+                       style="box-shadow:0 0 34px rgba(102,252,241,0.33);">
+                        Generate Your QR Code
+                        <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    </a>
+                    <a href="#about"
+                       class="interactive-btn inline-flex items-center gap-2 px-9 py-4 border border-qr-border text-qr-text hover:text-white font-display text-base rounded-full"
+                       style="transition:all 0.22s;">
+                        Explore Features
+                    </a>
+                </div>
+
+                <!-- Floating hero QR mockup -->
+                <div class="anim-float mt-20 inline-block">
+                    <div class="p-5 bg-qr-surface border border-qr-border rounded-2xl"
+                         style="box-shadow:0 32px 64px rgba(0,0,0,0.55);">
+                        <div class="bg-white p-3 rounded-xl flex items-center justify-center"
+                             style="min-height:156px;min-width:156px;">
+                            <div id="heroQrPreview"></div>
+                        </div>
+                        <p class="mt-3 text-center font-display font-bold uppercase tracking-widest"
+                           style="font-size:0.6rem;color:rgba(197,198,199,0.4);">Live Preview Below ↓</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ════════════════════════════════════════════════════
+             FEATURES
+        ════════════════════════════════════════════════════ -->
+        <section id="about" class="py-20 md:py-28 border-t border-qr-border">
+            <div class="container mx-auto px-5 sm:px-7 lg:px-10">
+
+                <div class="text-center mb-14 animate-on-scroll">
+                    <p class="text-qr-primary font-display font-bold tracking-widest uppercase mb-3"
+                       style="font-size:0.72rem;">Why QR Hub?</p>
+                    <h2 class="font-display font-black text-white leading-tight tracking-tight text-4xl sm:text-5xl">
+                        Elevate Your <span class="text-qr-primary">Digital Links</span>
+                    </h2>
+                    <p class="mt-3 text-qr-text text-base max-w-xl mx-auto">We blend simplicity with professional-grade technology.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card-animate p-7 bg-qr-surface border border-qr-border rounded-2xl animate-on-scroll"
+                         style="border-top: 2px solid #66fcf1;">
+                        <div class="feat-icon mb-5"><i data-lucide="infinity" class="w-5 h-5"></i></div>
+                        <h3 class="font-display font-extrabold text-white text-xl mb-2">Forever Free</h3>
+                        <p class="text-qr-text text-sm leading-relaxed">No subscriptions, no hidden fees. Generate unlimited non-expiring codes forever.</p>
+                    </div>
+                    <div class="card-animate p-7 bg-qr-surface border border-qr-border rounded-2xl animate-on-scroll"
+                         style="border-top: 2px solid #66fcf1; transition-delay:.1s">
+                        <div class="feat-icon mb-5"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
+                        <h3 class="font-display font-extrabold text-white text-xl mb-2">Client-Side Secure</h3>
+                        <p class="text-qr-text text-sm leading-relaxed">Your data never touches a server. Instant, 100% private processing in your browser.</p>
+                    </div>
+                    <div class="card-animate p-7 bg-qr-surface border border-qr-border rounded-2xl animate-on-scroll"
+                         style="border-top: 2px solid #66fcf1; transition-delay:.2s">
+                        <div class="feat-icon mb-5"><i data-lucide="palette" class="w-5 h-5"></i></div>
+                        <h3 class="font-display font-extrabold text-white text-xl mb-2">Fully Customisable</h3>
+                        <p class="text-qr-text text-sm leading-relaxed">Choose dot shapes, corner styles, custom colours, and export PNG or SVG.</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ════════════════════════════════════════════════════
+             QR GENERATOR
+        ════════════════════════════════════════════════════ -->
+        <section id="generator" class="py-20 md:py-28 border-t border-qr-border">
+            <div class="container mx-auto px-5 sm:px-7 lg:px-10">
+
+                <div class="text-center mb-14 animate-on-scroll">
+                    <p class="text-qr-primary font-display font-bold tracking-widest uppercase mb-3"
+                       style="font-size:0.72rem;">QR Generator</p>
+                    <h2 class="font-display font-black text-white leading-tight tracking-tight text-4xl sm:text-5xl">Create Your Code</h2>
+                    <p class="mt-3 text-qr-text text-base max-w-md mx-auto">Type or paste any URL or text — your QR code updates live.</p>
+                </div>
+
+                <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+
+                    <!-- LEFT: Controls ──────────────────────── -->
+                    <div class="space-y-5 animate-on-scroll">
+
+                        <!-- Input -->
+                        <div class="gen-card">
+                            <label class="gen-label">
+                                <i data-lucide="link" class="w-3.5 h-3.5 inline mr-1.5 text-qr-primary"></i>URL or Text
+                            </label>
+                            <input
+                                type="text"
+                                id="urlInput"
+                                placeholder="e.g. https://yourwebsite.com"
+                                class="qr-input"
+                            />
+                            <p class="mt-2 text-qr-text/40" style="font-size:0.7rem;">QR updates automatically as you type</p>
+                        </div>
+
+                        <!-- Customisation -->
+                        <div class="gen-card space-y-5">
+                            <p class="gen-label">
+                                <i data-lucide="settings-2" class="w-3.5 h-3.5 inline mr-1.5 text-qr-primary"></i>Customisation
+                            </p>
+
+                            <!-- Colours -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-qr-text/55 mb-1.5" style="font-size:0.72rem;">Dot Colour</label>
+                                    <label class="swatch-row">
+                                        <input type="color" id="dotColor" value="#1f2833">
+                                        <span id="dotColorHex" class="font-mono text-qr-text" style="font-size:0.72rem;">#1f2833</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-qr-text/55 mb-1.5" style="font-size:0.72rem;">Background</label>
+                                    <label class="swatch-row">
+                                        <input type="color" id="bgColor" value="#ffffff">
+                                        <span id="bgColorHex" class="font-mono text-qr-text" style="font-size:0.72rem;">#ffffff</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Dot style -->
+                            <div>
+                                <label class="block text-qr-text/55 mb-2" style="font-size:0.72rem;">Dot Style</label>
+                                <div class="grid grid-cols-3 gap-1.5" id="dotStyleGroup">
+                                    <button class="style-btn active" data-style="square">Square</button>
+                                    <button class="style-btn" data-style="dots">Dots</button>
+                                    <button class="style-btn" data-style="rounded">Rounded</button>
+                                    <button class="style-btn" data-style="classy">Classy</button>
+                                    <button class="style-btn" data-style="classy-rounded">Classy+</button>
+                                    <button class="style-btn" data-style="extra-rounded">X-Round</button>
+                                </div>
+                            </div>
+
+                            <!-- Corner style -->
+                            <div>
+                                <label class="block text-qr-text/55 mb-2" style="font-size:0.72rem;">Corner Shape</label>
+                                <div class="grid grid-cols-3 gap-1.5" id="cornerStyleGroup">
+                                    <button class="style-btn active" data-corner="square">Square</button>
+                                    <button class="style-btn" data-corner="dot">Dot</button>
+                                    <button class="style-btn" data-corner="extra-rounded">Rounded</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Download buttons -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <button id="downloadPng" class="dl-btn dl-btn-png interactive-btn" disabled>
+                                <i data-lucide="image" class="w-4 h-4"></i> Download PNG
+                            </button>
+                            <button id="downloadSvg" class="dl-btn dl-btn-svg interactive-btn" disabled>
+                                <i data-lucide="file-code-2" class="w-4 h-4"></i> Download SVG
+                            </button>
+                        </div>
+
+                    </div><!-- /LEFT -->
+
+                    <!-- RIGHT: Preview ──────────────────────── -->
+                    <div class="animate-on-scroll" style="transition-delay:.15s;">
+                        <div id="qrPreviewBox"
+                             class="gen-card flex flex-col items-center justify-center text-center min-h-[360px]">
+
+                            <!-- Empty state -->
+                            <div id="qrEmptyState">
+                                <i data-lucide="scan-qr-code" class="w-16 h-16 mx-auto mb-4"
+                                   style="color:#2a3a4a;"></i>
+                                <p class="font-display text-qr-text/38 text-sm">Start typing to see your QR code</p>
+                            </div>
+
+                            <!-- QR code output -->
+                            <div id="qrCodeWrapper" class="hidden flex flex-col items-center gap-4">
+                                <div id="qrCode" class="p-3 bg-white rounded-xl shadow-inner"></div>
+                                <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-full"
+                                     style="background:rgba(102,252,241,0.07);border:1px solid rgba(102,252,241,0.2);">
+                                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-qr-primary"></i>
+                                    <span class="font-display text-qr-text/55" style="font-size:0.7rem;">Ready to scan</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div><!-- /RIGHT -->
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════════════════════════════════════════════════
+             HOW IT WORKS
+        ════════════════════════════════════════════════════ -->
+        <section id="how" class="py-20 md:py-28 border-t border-qr-border">
+            <div class="container mx-auto px-5 sm:px-7 lg:px-10">
+
+                <div class="text-center mb-14 animate-on-scroll">
+                    <p class="text-qr-primary font-display font-bold tracking-widest uppercase mb-3"
+                       style="font-size:0.72rem;">Three Steps</p>
+                    <h2 class="font-display font-black text-white leading-tight tracking-tight text-4xl sm:text-5xl">Simple &amp; Fast</h2>
+                </div>
+
+                <div class="max-w-2xl mx-auto space-y-4">
+                    <div class="card-animate flex items-start gap-5 p-5 bg-qr-surface border border-qr-border rounded-2xl animate-on-scroll hover:border-qr-primary/25 transition-colors">
+                        <div class="step-badge">1</div>
+                        <div>
+                            <h4 class="font-display font-extrabold text-white text-lg mb-1">Enter Your Content</h4>
+                            <p class="text-qr-text text-sm leading-relaxed">Type or paste a URL, phone number, email, or any text into the input field.</p>
+                        </div>
+                    </div>
+                    <div class="card-animate flex items-start gap-5 p-5 bg-qr-surface border border-qr-border rounded-2xl animate-on-scroll hover:border-qr-primary/25 transition-colors" style="transition-delay:.1s;">
+                        <div class="step-badge">2</div>
+                        <div>
+                            <h4 class="font-display font-extrabold text-white text-lg mb-1">Customise the Design</h4>
+                            <p class="text-qr-text text-sm leading-relaxed">Pick dot styles, corner shapes, and custom colours. See changes in real time.</p>
+                        </div>
+                    </div>
+                    <div class="card-animate flex items-start gap-5 p-5 bg-qr-surface border border-qr-border rounded-2xl animate-on-scroll hover:border-qr-primary/25 transition-colors" style="transition-delay:.2s;">
+                        <div class="step-badge">3</div>
+                        <div>
+                            <h4 class="font-display font-extrabold text-white text-lg mb-1">Download &amp; Share</h4>
+                            <p class="text-qr-text text-sm leading-relaxed">Export as PNG for print or SVG for crisp infinite scaling in web and design tools.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ════════════════════════════════════════════════════════
+         FOOTER
+    ════════════════════════════════════════════════════════ -->
+    <footer id="contact" class="border-t border-qr-border bg-qr-surface py-14">
+        <div class="container mx-auto px-5 sm:px-7 lg:px-10">
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-10 pb-10 border-b border-qr-border mb-8">
+
+                <!-- Brand -->
+                <div>
+                    <a href="#home" class="flex items-center gap-2.5 mb-3">
+                        <div class="logo-mark">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b0c10" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/><path d="m14 14 3 3m0-3-3 3"/><path d="M17 14h4v4h-4z"/>
+                            </svg>
+                        </div>
+                        <span class="font-display font-black text-white text-xl">QR<span class="text-qr-primary">Hub</span></span>
+                    </a>
+                    <p class="text-sm leading-relaxed" style="color:rgba(197,198,199,0.6);">
+                        Simplifying the connection between print and digital.
+                    </p>
+                </div>
+
+                <!-- Quick links -->
+                <div>
+                    <h5 class="font-display font-extrabold text-white tracking-widest uppercase mb-4"
+                        style="font-size:0.7rem;">Quick Links</h5>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#generator" class="footer-link">Generator</a></li>
+                        <li><a href="#about"     class="footer-link">Features</a></li>
+                        <li><a href="#how"       class="footer-link">How It Works</a></li>
+                    </ul>
+                </div>
+
+                <!-- Contact -->
+                <div>
+                    <h5 class="font-display font-extrabold text-white tracking-widest uppercase mb-4"
+                        style="font-size:0.7rem;">Get In Touch</h5>
+                    <ul class="space-y-2 text-sm" style="color:rgba(197,198,199,0.6);">
+                        <li class="flex items-center gap-2">
+                            <i data-lucide="mail"    class="w-4 h-4 text-qr-primary shrink-0"></i>
+                            <a href="mailto:contact@qrhub.dev" class="footer-link">contact@qrhub.dev</a>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <i data-lucide="phone"   class="w-4 h-4 text-qr-primary shrink-0"></i>
+                            +92 (370) 025-6087
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <i data-lucide="map-pin" class="w-4 h-4 text-qr-primary shrink-0"></i>
+                            Karachi, Pakistan
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Social -->
+                <div>
+                    <h5 class="font-display font-extrabold text-white tracking-widest uppercase mb-4"
+                        style="font-size:0.7rem;">Connect</h5>
+                    <div class="flex gap-2.5">
+                        <a href="#" class="social-btn interactive-btn"><i data-lucide="instagram" class="w-4 h-4"></i></a>
+                        <a href="#" class="social-btn interactive-btn"><i data-lucide="twitter"   class="w-4 h-4"></i></a>
+                        <a href="#" class="social-btn interactive-btn"><i data-lucide="linkedin"  class="w-4 h-4"></i></a>
+                        <a href="#" class="social-btn interactive-btn"><i data-lucide="github"    class="w-4 h-4"></i></a>
+                    </div>
+                </div>
+
+            </div>
+
+            <p class="text-center" style="font-size:0.72rem;color:rgba(197,198,199,0.35);">
+                &copy; 2025 QR Hub. All rights reserved. Built with ❤️ in Karachi.
+            </p>
+        </div>
+    </footer>
+
+    <!-- ════════════════════════════════════════════════════════
+         SCRIPT — all logic inline (single file)
+    ════════════════════════════════════════════════════════ -->
+    <script>
+    (() => {
+        'use strict';
+
+        // ── Initialise icons ─────────────────────────────────
+        lucide.createIcons();
+
+        // ── App state ─────────────────────────────────────────
+        let qrInstance   = null;   // main QR (qr-code-styling)
+        let heroInstance = null;   // hero preview QR
+        let dotStyle     = 'square';
+        let cornerStyle  = 'square';
+        let debounceId   = null;
+
+        const BASE = {
+            width:  264,
+            height: 264,
+            margin: 10,
+            qrOptions:    { errorCorrectionLevel: 'H' },
+            imageOptions: { crossOrigin: 'anonymous', margin: 0 },
+        };
+
+        // ── DOM refs ──────────────────────────────────────────
+        const urlInput      = document.getElementById('urlInput');
+        const qrContainer   = document.getElementById('qrCode');
+        const emptyState    = document.getElementById('qrEmptyState');
+        const qrWrapper     = document.getElementById('qrCodeWrapper');
+        const btnPng        = document.getElementById('downloadPng');
+        const btnSvg        = document.getElementById('downloadSvg');
+        const dotColorEl    = document.getElementById('dotColor');
+        const bgColorEl     = document.getElementById('bgColor');
+        const dotColorHex   = document.getElementById('dotColorHex');
+        const bgColorHex    = document.getElementById('bgColorHex');
+
+        // ── Toast helper ─────────────────────────────────────
+        function toast(msg, ok = true) {
+            const el    = document.getElementById('toast');
+            const inner = document.getElementById('toastInner');
+            inner.className = [
+                'flex items-center gap-2.5 px-5 py-3 rounded-xl border shadow-2xl shadow-black/60 text-sm',
+                ok
+                    ? 'bg-qr-surface border-qr-primary/40 text-white'
+                    : 'bg-qr-surface border-red-500/40 text-red-400'
+            ].join(' ');
+            inner.innerHTML =
+                `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                      fill="none" stroke="${ok ? '#66fcf1' : '#f87171'}"
+                      stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    ${ok
+                        ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'
+                        : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'}
+                </svg>
+                <span style="font-family:'Syne',sans-serif;font-weight:700;">${msg}</span>`;
+            el.classList.add('show');
+            clearTimeout(el._t);
+            el._t = setTimeout(() => el.classList.remove('show'), 3300);
+        }
+
+        // ── Build QRCodeStyling config ────────────────────────
+        function buildCfg(text, size = 264) {
+            return {
+                ...BASE, width: size, height: size,
+                data: text,
+                dotsOptions:         { color: dotColorEl.value, type: dotStyle },
+                cornersSquareOptions:{ color: dotColorEl.value, type: cornerStyle },
+                cornersDotOptions:   { color: dotColorEl.value },
+                backgroundOptions:   { color: bgColorEl.value },
+            };
+        }
+
+        // ── Generate / update main QR ─────────────────────────
+        function generateQR(raw) {
+            const text = (raw || '').trim();
+
+            if (!text) {
+                emptyState.classList.remove('hidden');
+                qrWrapper.classList.add('hidden');
+                btnPng.disabled = btnSvg.disabled = true;
+                return;
+            }
+
+            if (!qrInstance) {
+                qrInstance = new QRCodeStyling(buildCfg(text));
+                qrInstance.append(qrContainer);
+            } else {
+                qrInstance.update(buildCfg(text));
+            }
+
+            emptyState.classList.add('hidden');
+            qrWrapper.classList.remove('hidden');
+            btnPng.disabled = btnSvg.disabled = false;
+            lucide.createIcons();
+        }
+
+        function refresh() { generateQR(urlInput.value); }
+
+        // ── Live input (debounced) ────────────────────────────
+        urlInput.addEventListener('input', () => {
+            clearTimeout(debounceId);
+            debounceId = setTimeout(() => generateQR(urlInput.value), 290);
+        });
+        urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') generateQR(urlInput.value); });
+
+        // ── Colour pickers ────────────────────────────────────
+        dotColorEl.addEventListener('input', () => { dotColorHex.textContent = dotColorEl.value; refresh(); });
+        bgColorEl.addEventListener('input',  () => { bgColorHex.textContent  = bgColorEl.value;  refresh(); });
+
+        // ── Dot-style buttons ─────────────────────────────────
+        document.querySelectorAll('#dotStyleGroup .style-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#dotStyleGroup .style-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                dotStyle = btn.dataset.style;
+                refresh();
+            });
+        });
+
+        // ── Corner-style buttons ──────────────────────────────
+        document.querySelectorAll('#cornerStyleGroup .style-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#cornerStyleGroup .style-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                cornerStyle = btn.dataset.corner;
+                refresh();
+            });
+        });
+
+        // ── Downloads ─────────────────────────────────────────
+        btnPng.addEventListener('click', () => {
+            if (!qrInstance) return;
+            qrInstance.download({ name: 'QRHub_Code', extension: 'png' });
+            toast('PNG downloaded successfully!');
+        });
+        btnSvg.addEventListener('click', () => {
+            if (!qrInstance) return;
+            qrInstance.download({ name: 'QRHub_Code', extension: 'svg' });
+            toast('SVG downloaded successfully!');
+        });
+
+        // ── Hero preview QR ───────────────────────────────────
+        const heroEl = document.getElementById('heroQrPreview');
+        if (heroEl) {
+            heroInstance = new QRCodeStyling({
+                ...BASE,
+                width: 144, height: 144, margin: 5,
+                data: 'https://codewithaliyan.github.io/Smart-QR-Generator/',
+                dotsOptions:         { color: '#1f2833', type: 'dots' },
+                cornersSquareOptions:{ color: '#1f2833', type: 'extra-rounded' },
+                cornersDotOptions:   { color: '#1f2833' },
+                backgroundOptions:   { color: '#ffffff' },
+            });
+            heroInstance.append(heroEl);
+        }
+
+        // ── Sticky header: hide on scroll-down ───────────────
+        let lastY = 0;
+        const header = document.getElementById('mainHeader');
+        window.addEventListener('scroll', () => {
+            const y = window.scrollY;
+            header.style.transform = (y > lastY && y > 80) ? 'translateY(-100%)' : 'translateY(0)';
+            lastY = y;
+        }, { passive: true });
+
+        // ── FIXED MOBILE MENU ───────────────────────────────────────
+        const menuBtn = document.getElementById('menu-toggle');
+        const mobileM = document.getElementById('mobile-menu');
+        const iOpen = document.getElementById('icon-open');
+        const iClose = document.getElementById('icon-close');
+
+        // Function to open menu
+        function openMobileMenu() {
+            mobileM.classList.remove('hidden');
+            iOpen.classList.add('hidden');
+            iClose.classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        // Function to close menu
+        function closeMobileMenu() {
+            mobileM.classList.add('hidden');
+            iOpen.classList.remove('hidden');
+            iClose.classList.add('hidden');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+
+        // Toggle menu on button click
+        if (menuBtn) {
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (mobileM.classList.contains('hidden')) {
+                    openMobileMenu();
+                } else {
+                    closeMobileMenu();
+                }
+            });
+        }
+
+        // Close menu when clicking a link
+        if (mobileM) {
+            mobileM.querySelectorAll('a').forEach(a => {
+                a.addEventListener('click', (e) => {
+                    closeMobileMenu();
+                });
+            });
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (mobileM && !mobileM.classList.contains('hidden') && 
+                !mobileM.contains(e.target) && 
+                menuBtn && !menuBtn.contains(e.target)) {
+                closeMobileMenu();
+            }
+        });
+
+        // Handle window resize - auto-close menu on desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) { // md breakpoint
+                closeMobileMenu();
+            }
+        });
+
+        // Prevent clicks inside menu from closing it (unless they're links)
+        if (mobileM) {
+            mobileM.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
+        // ── Scroll-reveal ─────────────────────────────────────
+        const revealObs = new IntersectionObserver(entries => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('in-view');
+                    revealObs.unobserve(e.target);
+                }
+            });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.animate-on-scroll').forEach(el => revealObs.observe(el));
+
+        // Re-render icons after all dynamic elements settle
+        setTimeout(() => lucide.createIcons(), 50);
+
+    })();
+    </script>
+
+</body>
+</html>
